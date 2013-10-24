@@ -84,20 +84,17 @@ if __name__ == "__main__":
 	spotifyOp = SpotifyClient()
 	
 	allSongs = []
-	
-	try:
-		for catalog in catalogs:
-			catalogOp = CatalogueOperations(None,catalog)
-			
-			for band in catalogOp.getBands():
-				for album in catalogOp.getAlbumsByBand(band):
-					album = spotifyOp.searchAlbum(album,band,'json')
-					if album is not None:
-						songList = spotifyOp.searchAlbumSongs(album['href'])
-						for song in songList:
-							allSongs.append(song)
-	except:
-		print "Max. requests exceeded"
+
+	for catalog in catalogs:
+		catalogOp = CatalogueOperations(None,catalog)
+		
+		for band in catalogOp.getBands():
+			for album in catalogOp.getAlbumsByBand(band):
+				album = spotifyOp.searchAlbum(album,band,'json')
+				if album is not None:
+					songList = spotifyOp.searchAlbumSongs(album['href'])
+					for song in songList:
+						allSongs.append(song)
 		
 	for i in range(1, 100):
 			song = choice(allSongs)
