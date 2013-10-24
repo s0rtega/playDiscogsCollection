@@ -2,16 +2,20 @@ __version_info__ = (0,0,1)
 __version__ = '0.0.1'
 
 import json
+import re
 
 class CatalogueOperations:
 
-	def __init__(self,path='catalog.json'):
+	def __init__(self,path='catalog.json',jsonCatalog=None):
 		self.path = path
 		self.catalog = catalog = {}
 		
 		# TODO: Load a catalog from json object
-		self.loadCatalog()
-		self.exportCatalog()
+		if catalog is None:
+			self.loadCatalog()
+		else:
+			self.json_catalog = jsonCatalog
+			self.exportCatalog()
 		
 	def loadCatalog(self):
 		self.json_catalog = json.load(open(self.path, 'r'))
@@ -21,11 +25,13 @@ class CatalogueOperations:
 			try:
 				albumList = self.catalog[album['basic_information']['artists'][0]['name']]
 				albumList.append(album['basic_information']['title'])
-				self.catalog[album['basic_information']['artists'][0]['name']] = albumList
+				artist = re.sub(r'\(.*\)', '',album['basic_information']['artists'][0]['name'])
+				self.catalog[artist] = albumList
 			except KeyError:
 				albumList = []
 				albumList.append(album['basic_information']['title'])
-				self.catalog[album['basic_information']['artists'][0]['name']] = albumList
+				artist = re.sub(r'\(.*\)', '',album['basic_information']['artists'][0]['name'])
+				self.catalog[artist] = albumList
 
 	def getAlbumsByBand(self,band):
 		return self.catalog[band]

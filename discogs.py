@@ -2,7 +2,6 @@ __version_info__ = (0,0,1)
 __version__ = '0.0.1'
 
 #requires pip install rauth
-from rauth import OAuth1Service
 import urllib2 
 import json
 import time
@@ -10,6 +9,9 @@ import re
 import webbrowser
 
 from extractCatalogueFromJSON import CatalogueOperations
+from spotify                  import SpotifyClient
+from rauth                    import OAuth1Service
+from random                   import choice
 
 class DiscogsClient:
 	
@@ -25,26 +27,25 @@ class DiscogsClient:
 		self.session = self.oauthLogin()		
 	
 	def getCatalog(self):
+		catalogList=[]
 		r = self.session.get(self.discogs.base_url+"oauth/identity", params={'User-agent' : 'GettingCollections Python2.7'})
 
 		if r.status_code == 200: #Estamos identificados 
 			releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()	
 			
-			with open ('catalog.json', 'w') as outfile:
-					json.dump(releases,outfile)
-					#outfile.write(jsonOutput[:-1]+"}")
+			#with open ('catalog.json', 'w') as outfile:
+			#		json.dump(releases,outfile)
 					
-			#for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
-				#time.sleep(1)		
-				#releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
+			catalogList.append(releases)
+			
+			for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
+				time.sleep(1)		
+				releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
 				#with open ('catalog.json', 'a') as outfile:
-				#	outfile.write(", {")
-				#	jsonOutput = json.dumps((str(releases['releases'])[2:-2]))
-				#	outfile.write(jsonOutput[1:-2]+"}")
-					
-			#with open ('catalog.json', 'a') as outfile:
-			#	outfile.write("\"}")
-				
+				#	json.dump(releases,outfile)
+				catalogList.append(releases)
+
+			return catalogList	
 	def oauthLogin(self):		
 		session = None
 		
@@ -77,9 +78,30 @@ class DiscogsClient:
 if __name__ == "__main__":
 	
 	discogsClient = DiscogsClient() 
-	discogsClient.getCatalog()
+	catalogs = discogsClient.getCatalog()
+
+	link = 'spotify:trackset:PlaylistName:'
+	spotifyOp = SpotifyClient()
 	
-	catalogOp = CatalogueOperations()
-	print catalogOp.catalog
+	allSongs = []
 	
-	webbrowser.open('spotify:trackset:PlaylistName:49MsPNQCOmxvIYi9AdoPzY,6fUlrsHaz4QfCNF31rk2dU,5KiTsR2h8jnzkvTeucxoAn,6kidUwWb8tB9ktfy7U76iX,6mlUEdb90RqwUisnp65lG7,6KOEK6SeCEZOQkLj5M1PxH,3psrcZoGRaWh6FMGael1NX,3EHLii6bnZxJxsCfLlIb83,0xJtHBdhpdLuClaSQYddI4,6fsdOFwa9lTG7WKL9sEWRUpotify:trackset:PlaylistName:49MsPNQCOmxvIYi9AdoPzY,6fUlrsHaz4QfCNF31rk2dU,5KiTsR2h8jnzkvTeucxoAn,6kidUwWb8tB9ktfy7U76iX,6mlUEdb90RqwUisnp65lG7,6KOEK6SeCEZOQkLj5M1PxH,3psrcZoGRaWh6FMGael1NX,3EHLii6bnZxJxsCfLlIb83,0xJtHBdhpdLuClaSQYddI4,6fsdOFwa9lTG7WKL9sEWRU')
+	try:
+		for catalog in catalogs:
+			catalogOp = CatalogueOperations(None,catalog)
+			
+			for band in catalogOp.getBands():
+				for album in catalogOp.getAlbumsByBand(band):
+					album = spotifyOp.searchAlbum(album,band,'json')
+					if album is not None:
+						songList = spotifyOp.searchAlbumSongs(album['href'])
+						for song in songList:
+							allSongs.append(song)
+	except:
+		print "Max. requests exceeded"
+		
+	for i in range(1, 100):
+			song = choice(allSongs)
+			allSongs.remove(song)
+			link+=song+","
+		
+	webbrowser.open(link[:-1])
