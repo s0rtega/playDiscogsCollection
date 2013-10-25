@@ -60,8 +60,8 @@ class DiscogsClient:
 		session = None
 		
 		try:
-			with open('oauth.sec'):
-				credentialsFile = open('oauth.sec', 'r')
+			with open('./sec/oauth.sec'):
+				credentialsFile = open('./sec/oauth.sec', 'r')
 				session = credentialsFile.read().split(";")			
 				access_token = session[0]
 				access_token_secret = session[1]
@@ -72,11 +72,14 @@ class DiscogsClient:
 			request_token, request_token_secret = self.discogs.get_request_token()
 			authorize_url                       = self.discogs.get_authorize_url(request_token) 
 			print 'Visit this URL in your browser: ' + authorize_url
+			webbrowser.open(authorize_url)
 			
 			pin = raw_input('Enter PIN from browser: ')
-			session = discogs.get_auth_session(request_token, request_token_secret,method='GET', data={'oauth_verifier': pin})
+			session = self.discogs.get_auth_session(request_token, request_token_secret,method='GET', data={'oauth_verifier': pin})
 			
-			credentialsFile = open('oauth.sec', 'w')
+			if not os.path.exists('./sec/'):
+					os.makedirs('./sec/')			
+			credentialsFile = open('./sec/oauth.sec', 'w')
 			credentialsFile.write(session.access_token+";"+session.access_token_secret)
 			credentialsFile.close()
 			
@@ -95,34 +98,33 @@ if __name__ == "__main__":
 	
 	allSongs = []
 
-	for catalog in catalogs:
-		catalogOp = None
-		if not exists:
-			catalogOp = CatalogueOperations(None,catalog)
-		else:
-			catalogOp = CatalogueOperations('./catalogs/'+catalog)
+	if not os.path.exists('./songs/'):		
+		os.makedirs('./songs/')		
+		for catalog in catalogs:
+			catalogOp = None
+			if not exists:
+				catalogOp = CatalogueOperations(None,catalog)
+			else:
+				catalogOp = CatalogueOperations('./catalogs/'+catalog)
 
-		for band in catalogOp.getBands():
-			for album in catalogOp.getAlbumsByBand(band):
-				album = spotifyOp.searchAlbum(album,band,'json')
-				if album is not None:
-					songList = spotifyOp.searchAlbumSongs(album['href'])
-					for song in songList:
-						allSongs.append(song)
-						
-	if not os.file.exists('./songs.lst'):
-		with open ('./songs.lst', 'w') as outfile:
-			outfile.write(allSongs)
+			for band in catalogOp.getBands():
+				for album in catalogOp.getAlbumsByBand(band):
+					album = spotifyOp.searchAlbum(album,band,'json')
+					if album is not None:
+						songList = spotifyOp.searchAlbumSongs(album['href'])
+						for song in songList:
+							allSongs.append(song)			
+							
+			with open ('./songs/allSongs.lst', 'w') as outfile:
+				for song in allSongs:
+					print>>outfile, song
 	else:
-		with open('./songs.lst', 'r') as f:
+		with open('./songs/allSongs.lst', 'r') as f:
 			allSongs = f.read().splitlines()
 			
 	for i in range(1, 100):
 			song = choice(allSongs)
 			allSongs.remove(song)
 			link+=song+","
-			
-	with open('./songs.lst', 'w') as f:
-			allSongs = f.write(allSongs)
 			
 	webbrowser.open(link[:-1])
