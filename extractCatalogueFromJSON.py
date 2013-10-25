@@ -7,15 +7,16 @@ import re
 class CatalogueOperations:
 
 	def __init__(self,path='catalog.json',jsonCatalog=None):
+		print path
 		self.path = path
 		self.catalog = catalog = {}
 		
-		# TODO: Load a catalog from json object
-		if catalog is None:
+		if jsonCatalog is None:
 			self.loadCatalog()
 		else:
 			self.json_catalog = jsonCatalog
-			self.exportCatalog()
+		
+		self.exportCatalog()
 		
 	def loadCatalog(self):
 		self.json_catalog = json.load(open(self.path, 'r'))

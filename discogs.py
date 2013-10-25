@@ -7,6 +7,7 @@ import json
 import time
 import re
 import webbrowser
+import os
 
 from extractCatalogueFromJSON import CatalogueOperations
 from spotify                  import SpotifyClient
@@ -28,24 +29,33 @@ class DiscogsClient:
 	
 	def getCatalog(self):
 		catalogList=[]
-		r = self.session.get(self.discogs.base_url+"oauth/identity", params={'User-agent' : 'GettingCollections Python2.7'})
+		exists = False
+		if os.path.exists('./catalogs/catalog.json'):
+			catalogList = os.listdir('./catalogs/')
+			exists = True
+			return catalogList,exists
+		else:
+			r = self.session.get(self.discogs.base_url+"oauth/identity", params={'User-agent' : 'GettingCollections Python2.7'})
 
-		if r.status_code == 200: #Estamos identificados 
-			releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()	
-			
-			#with open ('catalog.json', 'w') as outfile:
-			#		json.dump(releases,outfile)
-					
-			catalogList.append(releases)
-			
-			for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
-				time.sleep(1)		
-				releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
-				#with open ('catalog.json', 'a') as outfile:
-				#	json.dump(releases,outfile)
+			if r.status_code == 200: #Estamos identificados 
+				releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()	
+				
+				if not os.path.exists('./catalogs/'):
+					os.makedirs('./catalogs/')
+				with open ('./catalogs/catalog.json', 'w') as outfile:
+						json.dump(releases,outfile)
+						
 				catalogList.append(releases)
+				
+				for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
+					time.sleep(1)		
+					releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
+					with open ('catalogs/catalog'+str(i)+'.json', 'w') as outfile:
+						json.dump(releases,outfile)
 
-			return catalogList	
+					catalogList.append(releases)
+				return catalogList,exists	
+				
 	def oauthLogin(self):		
 		session = None
 		
@@ -78,7 +88,7 @@ class DiscogsClient:
 if __name__ == "__main__":
 	
 	discogsClient = DiscogsClient() 
-	catalogs = discogsClient.getCatalog()
+	catalogs,exists = discogsClient.getCatalog()
 
 	link = 'spotify:trackset:PlaylistName:'
 	spotifyOp = SpotifyClient()
@@ -86,8 +96,12 @@ if __name__ == "__main__":
 	allSongs = []
 
 	for catalog in catalogs:
-		catalogOp = CatalogueOperations(None,catalog)
-		
+		catalogOp = None
+		if not exists:
+			catalogOp = CatalogueOperations(None,catalog)
+		else:
+			catalogOp = CatalogueOperations('./catalogs/'+catalog)
+
 		for band in catalogOp.getBands():
 			for album in catalogOp.getAlbumsByBand(band):
 				album = spotifyOp.searchAlbum(album,band,'json')
@@ -95,10 +109,20 @@ if __name__ == "__main__":
 					songList = spotifyOp.searchAlbumSongs(album['href'])
 					for song in songList:
 						allSongs.append(song)
-		
+						
+	if not os.file.exists('./songs.lst'):
+		with open ('./songs.lst', 'w') as outfile:
+			outfile.write(allSongs)
+	else:
+		with open('./songs.lst', 'r') as f:
+			allSongs = f.read().splitlines()
+			
 	for i in range(1, 100):
 			song = choice(allSongs)
 			allSongs.remove(song)
 			link+=song+","
-		
+			
+	with open('./songs.lst', 'w') as f:
+			allSongs = f.write(allSongs)
+			
 	webbrowser.open(link[:-1])
