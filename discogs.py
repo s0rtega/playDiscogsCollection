@@ -47,13 +47,17 @@ class DiscogsClient:
 						
 				catalogList.append(releases)
 				
-				for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
-					time.sleep(1)		
-					releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
-					with open ('catalogs/catalog'+str(i)+'.json', 'w') as outfile:
-						json.dump(releases,outfile)
-
-					catalogList.append(releases)
+				try:
+					for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
+						time.sleep(1)		
+						releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
+						with open ('catalogs/catalog'+str(i)+'.json', 'w') as outfile:
+							json.dump(releases,outfile)
+	
+						catalogList.append(releases)
+				except KeyError:
+					pass
+					
 				return catalogList,exists	
 				
 	def oauthLogin(self):		
