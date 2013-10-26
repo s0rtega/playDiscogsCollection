@@ -32,7 +32,7 @@ class SpotifyClient:
 						print "Encontrado: "+album['name']
 						return album
 		except UnicodeEncodeError:
-			print "Can´t encode the title of the album"
+			print "Cant encode the title of the album"
 			
 	def searchAlbumSongs(self,albumUri,format='json'):
 		#print 'http://ws.spotify.com/lookup/1/.json?uri='+albumUri+'&extras=track'
