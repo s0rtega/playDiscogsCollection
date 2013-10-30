@@ -8,6 +8,8 @@ import time
 import re
 import webbrowser
 import os
+import requests
+import argparse
 
 from extractCatalogueFromJSON import CatalogueOperations
 from spotify                  import SpotifyClient
@@ -17,85 +19,121 @@ from random                   import choice
 class DiscogsClient:
 	
 	def __init__(self):
-		self.discogs = OAuth1Service(
+		self._discogsOauth = OAuth1Service(
 				consumer_key='MZQKzvMRSllgLxwhfMsv',
 				consumer_secret='xOVXcIEKdEnnTziVTWtxKOtUgpTjuQav',
 				name='discogs',
 				access_token_url='http://api.discogs.com/oauth/access_token',
 				authorize_url='http://www.discogs.com/oauth/authorize',
 				request_token_url='http://api.discogs.com/oauth/request_token',
-				base_url='http://api.discogs.com/')				
-		self.session = self.oauthLogin()		
+				base_url='http://api.discogs.com/')	
+
+	def fetchRequest(self,request,url,params):
+		r = request.get(url,params=params)
+		return r
 	
-	def getCatalog(self):
-		catalogList=[]
+	def fetchCatalog(self,type,username=None,authRequest=None):
+		catalogList = []
+		
+		if type == "private":
+			sender = self._session
+			url = authRequest['resource_url']+"/collection/folders/0/releases"
+		elif type == "public":
+			sender = requests
+			url = "http://api.discogs.com/users/"+username+"/collection/folders/0/releases"
+
+		releases = self.fetchRequest(sender,url,{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()
+		
+		if not os.path.exists('./catalogs/'):
+			os.makedirs('./catalogs/')
+		with open ('./catalogs/catalog.json', 'w') as outfile:
+				json.dump(releases,outfile)
+	
+		catalogList.append(releases)
+		try:
+			for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
+				time.sleep(1)
+				releases = self.fetchRequest(sender,url,{'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()								
+				with open ('catalogs/catalog'+str(i)+'.json', 'w') as outfile:
+					json.dump(releases,outfile)
+				catalogList.append(releases)							
+		except KeyError: # No existe mas de una pagina
+			pass
+			
+		return catalogList
+		
+	def getCatalog(self,username,force):
 		exists = False
-		if os.path.exists('./catalogs/catalog.json'):
+
+		# Checks if there is a catalog downloaded
+		if (os.path.exists('./catalogs/catalog.json') or force != True):
 			catalogList = os.listdir('./catalogs/')
 			exists = True
-			return catalogList,exists
+			return catalogList,exists	
+		
+		# If not, connect to discogs		
 		else:
-			r = self.session.get(self.discogs.base_url+"oauth/identity", params={'User-agent' : 'GettingCollections Python2.7'})
+			request = self.fetchRequest(requests,"http://api.discogs.com/users/"+username+"/collection/folders/0/releases", "{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '1'}")
 
-			if r.status_code == 200: #Estamos identificados 
-				releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()	
+			if request.status_code == 401: #Se requiere autenticacion
+				authRequest = self.getAuthLogin()
+				if authRequest['username'] != username:
+					print "This collection is private and you dont have access, search for another collection"
+					exit()					
+				else:
+					print "Private collection. Fetching..."
+					catalogList = self.fetchCatalog("private",None,authRequest)			
+					return catalogList,exists
+			else:
+				print "Public collection. Fetching..."
+				catalogList = self.fetchCatalog("public",username,None)			
+				return catalogList,exists
 				
-				if not os.path.exists('./catalogs/'):
-					os.makedirs('./catalogs/')
-				with open ('./catalogs/catalog.json', 'w') as outfile:
-						json.dump(releases,outfile)
-						
-				catalogList.append(releases)
-				
-				try:
-					for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
-						time.sleep(1)		
-						releases = self.session.get( r.json()['resource_url']+"/collection/folders/0/releases", params={'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()
-						with open ('catalogs/catalog'+str(i)+'.json', 'w') as outfile:
-							json.dump(releases,outfile)
-	
-						catalogList.append(releases)
-				except KeyError:
-					pass
-					
-				return catalogList,exists	
-				
-	def oauthLogin(self):		
+	def getAuthLogin(self):
+		self._session = self.oauthLogin() 
+		r = self._session.get(self._discogsOauth.base_url+"oauth/identity", params={'User-agent' : 'GettingCollections Python2.7'}).json()	
+		return r
+		
+	def oauthLogin(self):           
 		session = None
 		
 		try:
 			with open('./sec/oauth.sec'):
-				credentialsFile = open('./sec/oauth.sec', 'r')
-				session = credentialsFile.read().split(";")			
-				access_token = session[0]
-				access_token_secret = session[1]
-				session = self.discogs.get_session((access_token, access_token_secret))	
-				
-				
+					credentialsFile = open('./sec/oauth.sec', 'r')
+					session = credentialsFile.read().split(";")                     
+					access_token = session[0]
+					access_token_secret = session[1]
+					session = self._discogsOauth.get_session((access_token, access_token_secret)) 
+					
 		except IOError:
-			request_token, request_token_secret = self.discogs.get_request_token()
-			authorize_url                       = self.discogs.get_authorize_url(request_token) 
-			print 'Visit this URL in your browser: ' + authorize_url
-			webbrowser.open(authorize_url)
-			
-			pin = raw_input('Enter PIN from browser: ')
-			session = self.discogs.get_auth_session(request_token, request_token_secret,method='GET', data={'oauth_verifier': pin})
-			
-			if not os.path.exists('./sec/'):
-					os.makedirs('./sec/')			
-			credentialsFile = open('./sec/oauth.sec', 'w')
-			credentialsFile.write(session.access_token+";"+session.access_token_secret)
-			credentialsFile.close()
-			
-			access_token = session.access_token
-			access_token_secret = session.access_token_secret	
-			
+				request_token, request_token_secret = self._discogsOauth.get_request_token()
+				authorize_url                       = self._discogsOauth.get_authorize_url(request_token) 
+				print 'Visit this URL in your browser: ' + authorize_url
+				webbrowser.open(authorize_url)
+				
+				pin = raw_input('Enter PIN from browser: ')
+				session = self._discogsOauth.get_auth_session(request_token, request_token_secret,method='GET', data={'oauth_verifier': pin})
+				
+				if not os.path.exists('./sec/'):
+								os.makedirs('./sec/')                   
+				credentialsFile = open('./sec/oauth.sec', 'w')
+				credentialsFile.write(session.access_token+";"+session.access_token_secret)
+				credentialsFile.close()
+				
+				access_token 		= session.access_token
+				access_token_secret = session.access_token_secret       
+				
 		return session
 
 if __name__ == "__main__":
 	
+	parser = argparse.ArgumentParser(description='Fetch a collection on discogs and play it on Spotify')
+	parser.add_argument('-u','--user',  type=str, required=True,  help='User collection to play on Spotify')
+	parser.add_argument('-f','--force', required=False, action='store_false', help='Force to update the collection')
+	args = parser.parse_args()
+	
 	discogsClient = DiscogsClient() 
-	catalogs,exists = discogsClient.getCatalog()
+	catalogs,exists = discogsClient.getCatalog(args.user,args.force)
 
 	link = 'spotify:trackset:PlaylistName:'
 	spotifyOp = SpotifyClient()
