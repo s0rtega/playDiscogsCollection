@@ -6,7 +6,7 @@ import re
 
 class CatalogueOperations:
 
-	def __init__(self,path='catalog.json',jsonCatalog=None):
+	def __init__(self,path,jsonCatalog=None):
 		self.path = path
 		self.catalog = catalog = {}
 		

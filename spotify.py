@@ -6,6 +6,9 @@ import json
 import webbrowser
 import unicodedata
 import re
+import os
+
+from extractCatalogueFromJSON import CatalogueOperations
 
 class SpotifyClient:
 
@@ -43,6 +46,34 @@ class SpotifyClient:
 				songList.append(song['href'].replace("spotify:track:",""))
 
 		return songList
+		
+	def getSongsFromCatalog(self,catalogs,force,exists,username):
+		allSongs = []
+		if not os.path.exists('./songs/'):		
+			os.makedirs('./songs/')
+		if (not os.path.exists('./songs/allSongs'+username+'.lst') or force==True):					
+			for catalog in catalogs:
+				catalogOp = None
+				if not exists:
+					catalogOp = CatalogueOperations(None,catalog)
+				else:
+					catalogOp = CatalogueOperations('./catalogs/'+catalog)
+
+				for band in catalogOp.getBands():
+					for album in catalogOp.getAlbumsByBand(band):
+						album = self.searchAlbum(album,band,'json')
+						if album is not None:
+							songList = self.searchAlbumSongs(album['href'])
+							for song in songList:
+								allSongs.append(song)			
+								
+				with open ('./songs/allSongs'+username+'.lst', 'w') as outfile:
+					for song in allSongs:
+						print>>outfile, song
+		else:
+			with open('./songs/allSongs'+username+'.lst', 'r') as f:
+				allSongs = f.read().splitlines()
+		return allSongs
 		
 	def strip_accents(self,s):
 		return ''.join(c for c in unicodedata.normalize('NFD', s)

@@ -10,8 +10,8 @@ import webbrowser
 import os
 import requests
 import argparse
+import glob
 
-from extractCatalogueFromJSON import CatalogueOperations
 from spotify                  import SpotifyClient
 from rauth                    import OAuth1Service
 from random                   import choice
@@ -37,16 +37,18 @@ class DiscogsClient:
 		
 		if type == "private":
 			sender = self._session
+			username = authRequest['username']
 			url = authRequest['resource_url']+"/collection/folders/0/releases"
 		elif type == "public":
 			sender = requests
+
 			url = "http://api.discogs.com/users/"+username+"/collection/folders/0/releases"
 
 		releases = self.fetchRequest(sender,url,{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()
 		
 		if not os.path.exists('./catalogs/'):
 			os.makedirs('./catalogs/')
-		with open ('./catalogs/catalog.json', 'w') as outfile:
+		with open ('./catalogs/catalog'+username+'.json', 'w') as outfile:
 				json.dump(releases,outfile)
 	
 		catalogList.append(releases)
@@ -54,7 +56,7 @@ class DiscogsClient:
 			for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
 				time.sleep(1)
 				releases = self.fetchRequest(sender,url,{'User-agent' : 'GettingCollections Python2.7', 'per_page' : '100', 'page' : i+1}).json()								
-				with open ('catalogs/catalog'+str(i)+'.json', 'w') as outfile:
+				with open ('catalogs/catalog'+username+str(i)+'.json', 'w') as outfile:
 					json.dump(releases,outfile)
 				catalogList.append(releases)							
 		except KeyError: # No existe mas de una pagina
@@ -64,10 +66,9 @@ class DiscogsClient:
 		
 	def getCatalog(self,username,force):
 		exists = False
-
 		# Checks if there is a catalog downloaded
-		if (os.path.exists('./catalogs/catalog.json') or force != True):
-			catalogList = os.listdir('./catalogs/')
+		if (os.path.exists('./catalogs/catalog'+username+'.json') and force == False):
+			catalogList = glob.glob('./catalogs/catalog'+username+'*.json')
 			exists = True
 			return catalogList,exists	
 		
@@ -129,41 +130,16 @@ if __name__ == "__main__":
 	
 	parser = argparse.ArgumentParser(description='Fetch a collection on discogs and play it on Spotify')
 	parser.add_argument('-u','--user',  type=str, required=True,  help='User collection to play on Spotify')
-	parser.add_argument('-f','--force', required=False, action='store_false', help='Force to update the collection')
+	parser.add_argument('-f','--force', required=False, action='store_true', help='Force to update the collection')
 	args = parser.parse_args()
 	
 	discogsClient = DiscogsClient() 
 	catalogs,exists = discogsClient.getCatalog(args.user,args.force)
 
-	link = 'spotify:trackset:PlaylistName:'
 	spotifyOp = SpotifyClient()
 	
-	allSongs = []
-
-	if not os.path.exists('./songs/'):		
-		os.makedirs('./songs/')		
-		for catalog in catalogs:
-			catalogOp = None
-			if not exists:
-				catalogOp = CatalogueOperations(None,catalog)
-			else:
-				catalogOp = CatalogueOperations('./catalogs/'+catalog)
-
-			for band in catalogOp.getBands():
-				for album in catalogOp.getAlbumsByBand(band):
-					album = spotifyOp.searchAlbum(album,band,'json')
-					if album is not None:
-						songList = spotifyOp.searchAlbumSongs(album['href'])
-						for song in songList:
-							allSongs.append(song)			
-							
-			with open ('./songs/allSongs.lst', 'w') as outfile:
-				for song in allSongs:
-					print>>outfile, song
-	else:
-		with open('./songs/allSongs.lst', 'r') as f:
-			allSongs = f.read().splitlines()
-			
+	link = 'spotify:trackset:PlaylistName:'
+	allSongs = spotifyOp.getSongsFromCatalog(catalogs,args.force,exists,args.user)	
 	for i in range(1, 100):
 			song = choice(allSongs)
 			allSongs.remove(song)
