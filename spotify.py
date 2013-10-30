@@ -7,8 +7,10 @@ import webbrowser
 import unicodedata
 import re
 import os
+import webbrowser
 
 from extractCatalogueFromJSON import CatalogueOperations
+from random                   import choice
 
 class SpotifyClient:
 
@@ -74,6 +76,21 @@ class SpotifyClient:
 			with open('./songs/allSongs'+username+'.lst', 'r') as f:
 				allSongs = f.read().splitlines()
 		return allSongs
+		
+	def getURIforSongs(self,allSongs):
+		link = 'spotify:trackset:PlaylistName:'
+		try:
+			for i in range(1, 100):
+				song = choice(allSongs)
+				allSongs.remove(song)
+				link+=song+","
+		except IndexError:
+			print "No avaible songs for this resource"
+			exit()
+		return link
+	
+	def playSpotifyURI(self,uri):
+		webbrowser.open(uri[:-1])
 		
 	def strip_accents(self,s):
 		return ''.join(c for c in unicodedata.normalize('NFD', s)

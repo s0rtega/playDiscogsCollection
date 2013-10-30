@@ -14,7 +14,6 @@ import glob
 
 from spotify                  import SpotifyClient
 from rauth                    import OAuth1Service
-from random                   import choice
 
 class DiscogsClient:
 	
@@ -41,7 +40,6 @@ class DiscogsClient:
 			url = authRequest['resource_url']+"/collection/folders/0/releases"
 		elif type == "public":
 			sender = requests
-
 			url = "http://api.discogs.com/users/"+username+"/collection/folders/0/releases"
 
 		releases = self.fetchRequest(sender,url,{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()
@@ -85,6 +83,9 @@ class DiscogsClient:
 					print "Private collection. Fetching..."
 					catalogList = self.fetchCatalog("private",None,authRequest)			
 					return catalogList,exists
+			elif request.status_code == 404: #No se encuentra
+					print "This resource is not avaible"
+					exit()
 			else:
 				print "Public collection. Fetching..."
 				catalogList = self.fetchCatalog("public",username,None)			
@@ -137,12 +138,9 @@ if __name__ == "__main__":
 	catalogs,exists = discogsClient.getCatalog(args.user,args.force)
 
 	spotifyOp = SpotifyClient()
-	
-	link = 'spotify:trackset:PlaylistName:'
 	allSongs = spotifyOp.getSongsFromCatalog(catalogs,args.force,exists,args.user)	
-	for i in range(1, 100):
-			song = choice(allSongs)
-			allSongs.remove(song)
-			link+=song+","
+	uri = spotifyOp.getURIforSongs(allSongs)
+	
+	spotifyOp.playSpotifyURI(uri)
 			
-	webbrowser.open(link[:-1])
+	
