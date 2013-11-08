@@ -53,7 +53,7 @@ class DiscogsClient:
 	
 		catalogList.append(releases)
 		
-		# If all the pages in the catalog requested
+		# Fetch all the pages in the catalog requested
 		try:
 			for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
 				time.sleep(1)
@@ -61,7 +61,7 @@ class DiscogsClient:
 				with open ('catalogs/catalog'+username+str(i)+'.json', 'w') as outfile:
 					json.dump(releases,outfile)
 				catalogList.append(releases)							
-		except KeyError: # No existe mas de una pagina
+		except KeyError: # There is no more than 1 page
 			pass
 			
 		return catalogList
