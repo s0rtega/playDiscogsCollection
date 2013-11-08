@@ -17,8 +17,8 @@ class DiscogsClient:
 	# Init. Preparing the info for oAuth
 	def __init__(self):
 		self._discogsOauth = OAuth1Service(
-				consumer_key='MZQKzvMRSllgLxwhfMsv',
-				consumer_secret='xOVXcIEKdEnnTziVTWtxKOtUgpTjuQav',
+				consumer_key='XXXXXXXXXXXXXXXXX',
+				consumer_secret='XXXXXXXXXXXXXXXX',
 				name='discogs',
 				access_token_url='http://api.discogs.com/oauth/access_token',
 				authorize_url='http://www.discogs.com/oauth/authorize',
