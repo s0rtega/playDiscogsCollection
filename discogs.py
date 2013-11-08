@@ -1,7 +1,6 @@
 __version_info__ = (0,0,1)
 __version__ = '0.0.1'
 
-#requires pip install rauth
 import urllib2 
 import json
 import time
@@ -9,14 +8,13 @@ import re
 import webbrowser
 import os
 import requests
-import argparse
 import glob
 
-from spotify                  import SpotifyClient
-from rauth                    import OAuth1Service
+from rauth	import OAuth1Service
 
 class DiscogsClient:
 	
+	# Init. Preparing the info for oAuth
 	def __init__(self):
 		self._discogsOauth = OAuth1Service(
 				consumer_key='MZQKzvMRSllgLxwhfMsv',
@@ -27,13 +25,16 @@ class DiscogsClient:
 				request_token_url='http://api.discogs.com/oauth/request_token',
 				base_url='http://api.discogs.com/')	
 
+	# Get requested URL
 	def fetchRequest(self,request,url,params):
 		r = request.get(url,params=params)
 		return r
 	
+	# Get User catalog
 	def fetchCatalog(self,type,username=None,authRequest=None):
 		catalogList = []
 		
+		# If private the auth is required
 		if type == "private":
 			sender = self._session
 			username = authRequest['username']
@@ -44,12 +45,15 @@ class DiscogsClient:
 
 		releases = self.fetchRequest(sender,url,{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '100'}).json()
 		
+		# Prepare path to save the catalogs/info
 		if not os.path.exists('./catalogs/'):
 			os.makedirs('./catalogs/')
 		with open ('./catalogs/catalog'+username+'.json', 'w') as outfile:
-				json.dump(releases,outfile)
+				json.dump(releases,outfile) # Save to file
 	
 		catalogList.append(releases)
+		
+		# If all the pages in the catalog requested
 		try:
 			for i in range(1,int(re.compile('.*\&page=(.*)').match(releases['pagination']['urls']['last']).group(1))):			
 				time.sleep(1)
@@ -72,9 +76,9 @@ class DiscogsClient:
 		
 		# If not, connect to discogs		
 		else:
-			request = self.fetchRequest(requests,"http://api.discogs.com/users/"+username+"/collection/folders/0/releases", "{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '1'}")
+			request = self.fetchRequest(requests,"http://api.discogs.com/users/"+username+"/collection/folders/0/releases", "{'User-agent' : 'gettingCollections Python2.7', 'per_page' : '1'}") # Test if the collection can be downloaded
 
-			if request.status_code == 401: #Se requiere autenticacion
+			if request.status_code == 401: #User auth is required
 				authRequest = self.getAuthLogin()
 				if authRequest['username'] != username:
 					print "This collection is private and you dont have access, search for another collection"
@@ -83,14 +87,15 @@ class DiscogsClient:
 					print "Private collection. Fetching..."
 					catalogList = self.fetchCatalog("private",None,authRequest)			
 					return catalogList,exists
-			elif request.status_code == 404: #No se encuentra
+			elif request.status_code == 404: #Collection not found
 					print "This resource is not avaible"
 					exit()
-			else:
+			else: # No auth required
 				print "Public collection. Fetching..."
 				catalogList = self.fetchCatalog("public",username,None)			
 				return catalogList,exists
 				
+	# Login method
 	def getAuthLogin(self):
 		self._session = self.oauthLogin() 
 		r = self._session.get(self._discogsOauth.base_url+"oauth/identity", params={'User-agent' : 'GettingCollections Python2.7'}).json()	
@@ -125,22 +130,4 @@ class DiscogsClient:
 				access_token 		= session.access_token
 				access_token_secret = session.access_token_secret       
 				
-		return session
-
-if __name__ == "__main__":
-	
-	parser = argparse.ArgumentParser(description='Fetch a collection on discogs and play it on Spotify')
-	parser.add_argument('-u','--user',  type=str, required=True,  help='User collection to play on Spotify')
-	parser.add_argument('-f','--force', required=False, action='store_true', help='Force to update the collection')
-	args = parser.parse_args()
-	
-	discogsClient = DiscogsClient() 
-	catalogs,exists = discogsClient.getCatalog(args.user,args.force)
-
-	spotifyOp = SpotifyClient()
-	allSongs = spotifyOp.getSongsFromCatalog(catalogs,args.force,exists,args.user)	
-	uri = spotifyOp.getURIforSongs(allSongs)
-	
-	spotifyOp.playSpotifyURI(uri)
-			
-	
+		return session		

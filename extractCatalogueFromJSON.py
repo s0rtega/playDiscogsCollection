@@ -6,6 +6,7 @@ import re
 
 class CatalogueOperations:
 
+	# Check if the collection comes from file or from fetch
 	def __init__(self,path,jsonCatalog=None):
 		self.path = path
 		self.catalog = catalog = {}
@@ -20,6 +21,7 @@ class CatalogueOperations:
 	def loadCatalog(self):
 		self.json_catalog = json.load(open(self.path, 'r'))
 	
+	# Parse json information for [band][{album1,album2...}]
 	def exportCatalog(self):
 		for album in self.json_catalog['releases']:
 			try:
@@ -33,6 +35,7 @@ class CatalogueOperations:
 				artist = re.sub(r'\(.*\)', '',album['basic_information']['artists'][0]['name'])
 				self.catalog[artist] = albumList
 
+	# Get methods
 	def getAlbumsByBand(self,band):
 		return self.catalog[band]
 
@@ -54,9 +57,5 @@ if __name__ == "__main__":
 		print band
 		print catalogOp.getAlbumsByBand(band)
 		
-	print catalogOp.catalog
-	
-	
-
-		
+	print catalogOp.catalog	
 	
